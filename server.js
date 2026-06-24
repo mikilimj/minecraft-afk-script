@@ -288,6 +288,11 @@ async function startBot() {
     host: target.host, port: target.port, username: CONFIG.username,
     version: CONFIG.version, auth: CONFIG.auth,
     profilesFolder: path.join(CACHE_DIR, 'nmp-cache'),
+    onMsaCode: (data) => {
+      log('warn', `Microsoft auth required — visit: ${data.verification_uri}`);
+      log('warn', `Enter code: ${data.user_code}`);
+      broadcast('auth', { verification_uri: data.verification_uri, user_code: data.user_code });
+    },
   });
 
   bot.on('error', (err) => { log('error', `Connection error: ${err.message}`); scheduleReconnect(); });

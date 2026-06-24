@@ -198,3 +198,39 @@ input:focus, select:focus { outline: none; border-color: var(--blue); }
 .log-text  { word-break: break-word; }
 .log-entry.warn  .log-text { color: var(--yellow); }
 .log-entry.error .log-text { color: var(--red);    }
+
+/* ── AUTH BANNER ─────────────────────────────────────────────────────────── */
+.auth-banner {
+  margin: 10px 20px 0;
+  background: var(--surface);
+  border: 1px solid var(--yellow);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.auth-banner-body { display: flex; flex-direction: column; gap: 10px; }
+.auth-banner-title { font-size: 13px; font-weight: 600; color: var(--yellow); }
+.auth-banner-code {
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text);
+}
+.auth-banner-btn { font-size: 13px; padding: 7px 14px; align-self: flex-start; }
+.auth-banner-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.auth-banner-dismiss:hover { color: var(--text); }

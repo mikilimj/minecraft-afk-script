@@ -94,6 +94,14 @@
         <h2>Activity Log</h2>
         <button id="btn-clear-log" class="btn btn-ghost">Clear</button>
       </div>
+      <div id="auth-banner" class="auth-banner" style="display:none">
+        <div class="auth-banner-body">
+          <div class="auth-banner-title">Microsoft login required</div>
+          <div class="auth-banner-code" id="auth-code"></div>
+          <a id="auth-link" href="#" target="_blank" class="btn btn-primary auth-banner-btn">Open Microsoft login</a>
+        </div>
+        <button id="auth-dismiss" class="auth-banner-dismiss">×</button>
+      </div>
       <div id="log" class="log-entries"></div>
     </section>
   </main>

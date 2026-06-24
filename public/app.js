@@ -6,6 +6,10 @@ const btnSave       = document.getElementById('btn-save');
 const btnClearLog   = document.getElementById('btn-clear-log');
 const logEl         = document.getElementById('log');
 const saveMsgEl     = document.getElementById('save-msg');
+const authBanner    = document.getElementById('auth-banner');
+const authCode      = document.getElementById('auth-code');
+const authLink      = document.getElementById('auth-link');
+const authDismiss   = document.getElementById('auth-dismiss');
 
 // ── WEBSOCKET ─────────────────────────────────────────────────────────────────
 let ws;
@@ -15,6 +19,7 @@ function connectWS() {
     const msg = JSON.parse(e.data);
     if (msg.type === 'log')    appendLog(msg.level, msg.text, msg.time);
     if (msg.type === 'status') applyStatus(msg.state);
+    if (msg.type === 'auth')   showAuthBanner(msg.verification_uri, msg.user_code);
   };
   ws.onclose = () => setTimeout(connectWS, 1000);
 }
@@ -33,7 +38,22 @@ function applyStatus(state) {
   statusBadge.textContent = STATUS_LABELS[state] ?? `● ${state}`;
   btnConnect.disabled     = state !== 'idle';
   btnDisconnect.disabled  = state === 'idle';
+  if (state === 'connected') hideAuthBanner();
 }
+
+// ── AUTH BANNER ───────────────────────────────────────────────────────────────
+function showAuthBanner(uri, code) {
+  authCode.textContent = code;
+  authLink.href = uri;
+  authBanner.style.display = 'flex';
+  window.open(uri, '_blank');
+}
+
+function hideAuthBanner() {
+  authBanner.style.display = 'none';
+}
+
+authDismiss.addEventListener('click', hideAuthBanner);
 
 // ── LOG ───────────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
