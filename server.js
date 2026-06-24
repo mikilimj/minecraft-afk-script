@@ -3,6 +3,8 @@ const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const GoalXYZ = goals.GoalXYZ;
 const fs = require('fs');
 const path = require('path');
+const net = require('net');
+const dns = require('dns').promises;
 const http = require('http');
 const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
@@ -163,7 +165,7 @@ function scheduleReconnect() {
     state.atPosition    = false;
     state.transferTimeout = null;
     log('info', 'Reconnecting...');
-    startBot();
+    startBot().catch((err) => log('error', `Failed to start bot: ${err.message}`));
   }, delaySec * 1000);
 }
 
@@ -239,7 +241,35 @@ function stopBot() {
 }
 
 // ── START BOT ─────────────────────────────────────────────────────────────────
-function startBot() {
+// Minecraft servers commonly publish only a `_minecraft._tcp.<host>` SRV
+// record (with the real host + port) and no A record on the bare domain.
+// mineflayer resolves SRV itself but does not retry, so a single flaky
+// lookup (e.g. an intermittent systemd-resolved SERVFAIL) makes it fall back
+// to <host>:<port>, which then fails with "no address". We resolve the SRV
+// ourselves with retries and hand mineflayer a concrete host + port.
+async function resolveServerAddress(host, port, { resolveSrv = dns.resolveSrv, retries = 3, retryDelayMs = 400 } = {}) {
+  if (net.isIP(host)) return { host, port };
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const records = await resolveSrv(`_minecraft._tcp.${host}`);
+      if (records && records.length > 0) {
+        return { host: records[0].name, port: records[0].port };
+      }
+      return { host, port }; // SRV name exists but has no records
+    } catch (err) {
+      // Domain genuinely has no SRV record — use the host:port as entered.
+      if (err && (err.code === 'ENODATA' || err.code === 'ENOTFOUND')) {
+        return { host, port };
+      }
+      // Transient resolver failure (SERVFAIL, timeout, refused) — retry.
+      if (attempt >= retries) return { host, port };
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
+  }
+}
+
+async function startBot() {
   if (bot) { try { bot.removeAllListeners(); bot.quit(); } catch (_) {} bot = null; }
   clearAntiAfk();
   clearTimeout(state.transferTimeout);
@@ -249,8 +279,13 @@ function startBot() {
   setStatus('connecting');
   log('info', `Connecting to ${CONFIG.host}:${CONFIG.port}...`);
 
+  const target = await resolveServerAddress(CONFIG.host, CONFIG.port);
+  if (target.host !== CONFIG.host || target.port !== CONFIG.port) {
+    log('info', `Resolved ${CONFIG.host} via SRV to ${target.host}:${target.port}`);
+  }
+
   bot = mineflayer.createBot({
-    host: CONFIG.host, port: CONFIG.port, username: CONFIG.username,
+    host: target.host, port: target.port, username: CONFIG.username,
     version: CONFIG.version, auth: CONFIG.auth,
     profilesFolder: path.join(CACHE_DIR, 'nmp-cache'),
   });
@@ -405,7 +440,11 @@ app.post('/api/config', (req, res) => {
 
 app.post('/api/bot/start', (_req, res) => {
   if (botStatus !== 'idle') return res.json({ ok: false, reason: 'already running' });
-  startBot();
+  startBot().catch((err) => {
+    log('error', `Failed to start bot: ${err.message}`);
+    botStatus = 'idle';
+    setStatus('idle');
+  });
   res.json({ ok: true });
 });
 
@@ -420,4 +459,4 @@ function start(port = 3000) {
   server.listen(port, () => _log(`Web UI: http://localhost:${port}`));
 }
 
-module.exports = { app, normalizeLoadedConfig, start };
+module.exports = { app, normalizeLoadedConfig, resolveServerAddress, start };
