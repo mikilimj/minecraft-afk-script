@@ -1,2 +1,2 @@
 const { start } = require('./server');
-start(3000);
+start(3006);
