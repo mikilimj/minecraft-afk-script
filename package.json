@@ -8,9 +8,11 @@
     "test": "jest"
   },
   "dependencies": {
+    "canvas": "^3.2.3",
     "express": "^5.2.1",
     "mineflayer": "^4.37.1",
     "mineflayer-pathfinder": "^2.4.5",
+    "prismarine-viewer": "^1.33.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
@@ -19,6 +21,9 @@
   },
   "jest": {
     "forceExit": true,
-    "testPathIgnorePatterns": ["/node_modules/", "/.claude/"]
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.claude/"
+    ]
   }
 }

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bot 3D View</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; }
+    .view-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #1b1f27; }
+    .view-bar h1 { font-size: 1rem; margin: 0; }
+    #pov-frame { flex: 1; border: 0; width: 100%; }
+    .view-msg { padding: 12px; color: #f7b; }
+  </style>
+</head>
+<body>
+  <div class="view-bar">
+    <h1 id="title">Bot 3D View</h1>
+    <label><input type="checkbox" id="firstperson"> POV (first person)</label>
+    <span class="view-msg" id="msg"></span>
+  </div>
+  <iframe id="pov-frame"></iframe>
+  <script src="view.js"></script>
+</body>
+</html>

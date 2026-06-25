@@ -2,6 +2,7 @@ const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const GoalXYZ = goals.GoalXYZ;
 const { stripColors, resolveServerAddress } = require('./util');
+const { snapshotInventory } = require('./inventory');
 
 const BLOCKED_TRANSFER_PACKETS = new Set([
   'position', 'position_look', 'look', 'flying', 'window_close',
@@ -9,7 +10,7 @@ const BLOCKED_TRANSFER_PACKETS = new Set([
 ]);
 
 class BotRunner {
-  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue }) {
+  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue, onInventory }) {
     this.accountId = accountId;
     this.name = name;
     this.config = config;
@@ -19,8 +20,14 @@ class BotRunner {
     this.msaQueue = msaQueue || null;
     this.bot = null;
     this._status = 'idle';
+    this._viewerPort = null;
+    this._viewerFirstPerson = false;
     this.antiAfkInterval = null;
     this.reconnectTimeout = null;
+    this.autoclickInterval = null;
+    this._onInventory = onInventory || null;
+    this._invThrottle = null;
+    this._invWired = false;
     this.state = {
       phase: 'LOBBY', loggedIn: false, seenLobby: false,
       onTargetServer: false, atPosition: false, transferTimeout: null,
@@ -29,6 +36,14 @@ class BotRunner {
 
   get status() { return this._status; }
   _setStatus(s) { this._status = s; this._setStatusCb(s); }
+
+  _emitInventory() {
+    if (!this._onInventory || this._invThrottle) return;
+    this._invThrottle = setTimeout(() => {
+      this._invThrottle = null;
+      try { this._onInventory(snapshotInventory(this.bot)); } catch (_) {}
+    }, 500);
+  }
 
   // ── ANTI-AFK ─────────────────────────────────────────────────────────────────
   startAntiAfk() {
@@ -49,9 +64,130 @@ class BotRunner {
     if (this.antiAfkInterval) { clearInterval(this.antiAfkInterval); this.antiAfkInterval = null; }
   }
 
+  // ── COMMANDS ──────────────────────────────────────────────────────────────────
+  command(action, params = {}) {
+    switch (action) {
+      case 'chat':          this.chat(params.text); break;
+      case 'gotoXYZ':       this.gotoXYZ(params.x, params.y, params.z); break;
+      case 'control':       this.setControl(params.key, params.state); break;
+      case 'clearControls': this.clearControls(); break;
+      case 'attack':        this.attackNearest(params.target); break;
+      case 'autoclick':
+        if (params.on) this.startAutoclick(params.mode, params.intervalMs);
+        else this.stopAutoclick();
+        break;
+      default: throw new Error(`unknown action: ${action}`);
+    }
+  }
+
+  chat(text) { if (this.bot && text) this.bot.chat(String(text)); }
+
+  setControl(key, state) {
+    const allowed = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'];
+    if (this.bot && allowed.includes(key)) this.bot.setControlState(key, !!state);
+  }
+
+  clearControls() {
+    if (!this.bot) return;
+    for (const k of ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']) {
+      this.bot.setControlState(k, false);
+    }
+  }
+
+  gotoXYZ(x, y, z) {
+    if (!this.bot) return;
+    try {
+      const mcData    = this.bot.registry || require('minecraft-data')(this.bot.version);
+      const movements = new Movements(this.bot, mcData);
+      movements.canDig = false;
+      this.bot.pathfinder.setMovements(movements);
+      this.bot.pathfinder.setGoal(new GoalXYZ(Number(x), Number(y), Number(z)));
+      this.log('info', `Command: navigating to X:${x} Y:${y} Z:${z}`);
+    } catch (err) {
+      this.log('error', `goto error: ${err.message}`);
+    }
+  }
+
+  attackNearest(targetName) {
+    if (!this.bot) return;
+    const match = targetName
+      ? (e) => e.name === targetName || e.username === targetName
+      : (e) => e.type === 'mob' || e.type === 'player' || e.type === 'hostile';
+    const entity = this.bot.nearestEntity(match);
+    if (!entity) { this.log('warn', 'Command: no entity to attack.'); return; }
+    try {
+      this.bot.lookAt(entity.position.offset(0, entity.height ?? 1, 0));
+      this.bot.attack(entity);
+    } catch (err) { this.log('error', `attack error: ${err.message}`); }
+  }
+
+  startAutoclick(mode = 'left', intervalMs = 200) {
+    this.stopAutoclick();
+    const interval = Math.max(20, parseInt(intervalMs, 10) || 200);
+    this.log('info', `Autoclicker started (${mode}, ${interval}ms).`);
+    this.autoclickInterval = setInterval(() => {
+      if (!this.bot) return;
+      try {
+        if (mode === 'right') {
+          this.bot.activateItem();
+        } else {
+          this.bot.swingArm('right');
+          const entity = this.bot.nearestEntity((e) => e.type === 'mob' || e.type === 'player' || e.type === 'hostile');
+          if (entity) this.bot.attack(entity);
+        }
+      } catch (_) { /* swing on empty world is harmless */ }
+    }, interval);
+  }
+
+  stopAutoclick() {
+    if (this.autoclickInterval) {
+      clearInterval(this.autoclickInterval);
+      this.autoclickInterval = null;
+      this.log('info', 'Autoclicker stopped.');
+    }
+  }
+
+  // ── 3D VIEWER ─────────────────────────────────────────────────────────────────
+  startViewer(port, firstPerson = false) {
+    const modeChanged = this._viewerFirstPerson !== !!firstPerson;
+    this._viewerPort = port;
+    this._viewerFirstPerson = !!firstPerson;
+    if (modeChanged && this.bot && this.bot.viewer) {
+      try { this.bot.viewer.close(); } catch (_) {}
+      this.bot.viewer = null;
+    }
+    this._attachViewer();
+  }
+
+  _attachViewer() {
+    if (this._viewerPort == null) return;
+    if (!this.bot || !this.bot.entity) return;   // viewer needs a spawned entity
+    if (this.bot.viewer) return;                 // already attached
+    try {
+      const { mineflayer: mineflayerViewer } = require('prismarine-viewer');
+      mineflayerViewer(this.bot, {
+        port: this._viewerPort,
+        firstPerson: this._viewerFirstPerson,
+        viewDistance: 6,
+      });
+      this.log('info', `3D view started on port ${this._viewerPort}.`);
+    } catch (err) {
+      this.log('error', `Viewer error: ${err.message}`);
+    }
+  }
+
+  stopViewer() {
+    this._viewerPort = null;
+    if (this.bot && this.bot.viewer) {
+      try { this.bot.viewer.close(); } catch (_) {}
+      this.bot.viewer = null;
+    }
+  }
+
   // ── RECONNECT ─────────────────────────────────────────────────────────────────
   scheduleReconnect() {
     this.clearAntiAfk();
+    this.stopAutoclick();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
     if (this.reconnectTimeout) return;
@@ -138,9 +274,15 @@ class BotRunner {
     clearTimeout(this.reconnectTimeout);
     this.reconnectTimeout = null;
     this.clearAntiAfk();
+    this.stopAutoclick();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
-    if (this.bot) { try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {} this.bot = null; }
+    if (this._invThrottle) { clearTimeout(this._invThrottle); this._invThrottle = null; }
+    if (this.bot) {
+      try { this.bot.viewer && this.bot.viewer.close(); } catch (_) {}
+      try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {}
+      this.bot = null;
+    }
     if (this.msaQueue) this.msaQueue.remove(this.accountId);
     this._setStatus('idle');
     this.log('info', 'Bot stopped.');
@@ -148,10 +290,15 @@ class BotRunner {
 
   // ── START BOT ─────────────────────────────────────────────────────────────────
   async start() {
-    if (this.bot) { try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {} this.bot = null; }
+    if (this.bot) {
+      try { this.bot.viewer && this.bot.viewer.close(); } catch (_) {}
+      try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {}
+      this.bot = null;
+    }
     this.clearAntiAfk();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
+    this._invWired = false;
 
     this._setStatus('connecting');
     this.log('info', `Connecting to ${this.config.host}:${this.config.port}...`);
@@ -209,6 +356,12 @@ class BotRunner {
     });
 
     this.bot.on('spawn', () => {
+      this._attachViewer();
+      this._emitInventory();
+      if (this.bot.inventory && !this._invWired) {
+        this._invWired = true;
+        this.bot.inventory.on('updateSlot', () => this._emitInventory());
+      }
       if (!this.state.seenLobby) {
         this.state.seenLobby = true;
         this.state.phase     = 'LOBBY';

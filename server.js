@@ -13,6 +13,18 @@ const { resolveConfig, makeAccount, normalizeConfig, loadConfigFile, saveConfigF
 let CONFIG = { global: null, accounts: [] };   // set in start()
 const runners = new Map();                      // accountId -> BotRunner
 
+const VIEWER_PORT_BASE = 3100;
+const viewerPorts = new Map();   // accountId -> viewer http port
+
+function allocateViewerPort(map, accountId, base = VIEWER_PORT_BASE) {
+  if (map.has(accountId)) return map.get(accountId);
+  const used = new Set(map.values());
+  let port = base;
+  while (used.has(port)) port++;
+  map.set(accountId, port);
+  return port;
+}
+
 // ── EXPRESS + WEBSOCKET ──────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
@@ -49,6 +61,7 @@ function makeRunner(account) {
     log: accountLog(account.id),
     setStatus: (state) => broadcast('status', { accountId: account.id, state }),
     msaQueue,
+    onInventory: (slots) => broadcast('inventory', { accountId: account.id, slots }),
   });
 }
 
@@ -102,6 +115,7 @@ app.post('/api/accounts', (req, res) => {
 app.delete('/api/accounts/:id', (req, res) => {
   const r = runners.get(req.params.id);
   if (r) { r.stop(); runners.delete(req.params.id); }
+  viewerPorts.delete(req.params.id);
   CONFIG.accounts = CONFIG.accounts.filter((a) => a.id !== req.params.id);
   saveConfigFile(CONFIG);
   res.json({ ok: true });
@@ -141,6 +155,32 @@ app.post('/api/bot/stop-all', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/bot/view/:id', (req, res) => {
+  const r = runners.get(req.params.id);
+  if (!r || r.status === 'idle') return res.status(409).json({ error: 'bot not running' });
+  const port = allocateViewerPort(viewerPorts, req.params.id);
+  r.startViewer(port, !!req.body?.firstPerson);
+  res.json({ port });
+});
+
+app.delete('/api/bot/view/:id', (req, res) => {
+  const r = runners.get(req.params.id);
+  if (r) r.stopViewer();
+  res.json({ ok: true });
+});
+
+app.post('/api/bot/command', (req, res) => {
+  const { ids = [], action, params = {} } = req.body ?? {};
+  const results = [];
+  for (const id of ids) {
+    const r = runners.get(id);
+    if (!r || r.status === 'idle') { results.push({ id, ok: false, reason: 'not running' }); continue; }
+    try { r.command(action, params); results.push({ id, ok: true }); }
+    catch (e) { results.push({ id, ok: false, reason: e.message }); }
+  }
+  res.json({ results });
+});
+
 app.post('/api/auth/skip', (_req, res) => { msaQueue.skip(); res.json({ ok: true }); });
 
 // ── START ─────────────────────────────────────────────────────────────────────
@@ -149,4 +189,4 @@ function start(port = 3000) {
   server.listen(port, () => _log(`Web UI: http://localhost:${port}`));
 }
 
-module.exports = { app, normalizeConfig, resolveConfig, resolveServerAddress, start };
+module.exports = { app, normalizeConfig, resolveConfig, resolveServerAddress, start, allocateViewerPort };
