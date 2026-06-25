@@ -2,6 +2,7 @@ const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
 const GoalXYZ = goals.GoalXYZ;
 const { stripColors, resolveServerAddress } = require('./util');
+const { snapshotInventory } = require('./inventory');
 
 const BLOCKED_TRANSFER_PACKETS = new Set([
   'position', 'position_look', 'look', 'flying', 'window_close',
@@ -9,7 +10,7 @@ const BLOCKED_TRANSFER_PACKETS = new Set([
 ]);
 
 class BotRunner {
-  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue }) {
+  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue, onInventory }) {
     this.accountId = accountId;
     this.name = name;
     this.config = config;
@@ -24,6 +25,9 @@ class BotRunner {
     this.antiAfkInterval = null;
     this.reconnectTimeout = null;
     this.autoclickInterval = null;
+    this._onInventory = onInventory || null;
+    this._invThrottle = null;
+    this._invWired = false;
     this.state = {
       phase: 'LOBBY', loggedIn: false, seenLobby: false,
       onTargetServer: false, atPosition: false, transferTimeout: null,
@@ -32,6 +36,14 @@ class BotRunner {
 
   get status() { return this._status; }
   _setStatus(s) { this._status = s; this._setStatusCb(s); }
+
+  _emitInventory() {
+    if (!this._onInventory || this._invThrottle) return;
+    this._invThrottle = setTimeout(() => {
+      this._invThrottle = null;
+      try { this._onInventory(snapshotInventory(this.bot)); } catch (_) {}
+    }, 500);
+  }
 
   // ── ANTI-AFK ─────────────────────────────────────────────────────────────────
   startAntiAfk() {
@@ -264,6 +276,7 @@ class BotRunner {
     this.stopAutoclick();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
+    if (this._invThrottle) { clearTimeout(this._invThrottle); this._invThrottle = null; }
     if (this.bot) {
       try { this.bot.viewer && this.bot.viewer.close(); } catch (_) {}
       try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {}
@@ -284,6 +297,7 @@ class BotRunner {
     this.clearAntiAfk();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
+    this._invWired = false;
 
     this._setStatus('connecting');
     this.log('info', `Connecting to ${this.config.host}:${this.config.port}...`);
@@ -342,6 +356,11 @@ class BotRunner {
 
     this.bot.on('spawn', () => {
       this._attachViewer();
+      this._emitInventory();
+      if (this.bot.inventory && !this._invWired) {
+        this._invWired = true;
+        this.bot.inventory.on('updateSlot', () => this._emitInventory());
+      }
       if (!this.state.seenLobby) {
         this.state.seenLobby = true;
         this.state.phase     = 'LOBBY';
