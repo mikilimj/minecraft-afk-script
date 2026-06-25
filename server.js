@@ -13,6 +13,18 @@ const { resolveConfig, makeAccount, normalizeConfig, loadConfigFile, saveConfigF
 let CONFIG = { global: null, accounts: [] };   // set in start()
 const runners = new Map();                      // accountId -> BotRunner
 
+const VIEWER_PORT_BASE = 3100;
+const viewerPorts = new Map();   // accountId -> viewer http port
+
+function allocateViewerPort(map, accountId, base = VIEWER_PORT_BASE) {
+  if (map.has(accountId)) return map.get(accountId);
+  const used = new Set(map.values());
+  let port = base;
+  while (used.has(port)) port++;
+  map.set(accountId, port);
+  return port;
+}
+
 // ── EXPRESS + WEBSOCKET ──────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
@@ -149,4 +161,4 @@ function start(port = 3000) {
   server.listen(port, () => _log(`Web UI: http://localhost:${port}`));
 }
 
-module.exports = { app, normalizeConfig, resolveConfig, resolveServerAddress, start };
+module.exports = { app, normalizeConfig, resolveConfig, resolveServerAddress, start, allocateViewerPort };
