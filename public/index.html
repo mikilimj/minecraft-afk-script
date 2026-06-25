@@ -86,6 +86,79 @@
         <div id="account-list"></div>
       </section>
 
+      <section class="command-panel">
+        <h2>Commands</h2>
+        <div class="cmd-selector">
+          <div class="cmd-selector-head">
+            <span>Target bots</span>
+            <div>
+              <button id="cmd-select-all" class="btn btn-ghost">Select all</button>
+              <button id="cmd-clear-all" class="btn btn-ghost">Clear all</button>
+            </div>
+          </div>
+          <div id="cmd-bot-list" class="cmd-bot-list"></div>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Movement</h3>
+          <div class="cmd-move-mode">
+            <label><input type="radio" name="move-mode" value="pathfind" checked> Pathfind (XYZ)</label>
+            <label><input type="radio" name="move-mode" value="manual"> Manual (WASD)</label>
+          </div>
+          <div id="cmd-pathfind" class="cmd-move-pane">
+            <div class="row three">
+              <label>X<input id="cmd-x" type="number" step="0.1" value="0"></label>
+              <label>Y<input id="cmd-y" type="number" step="0.1" value="64"></label>
+              <label>Z<input id="cmd-z" type="number" step="0.1" value="0"></label>
+            </div>
+            <button id="cmd-go" class="btn btn-primary">Go</button>
+          </div>
+          <div id="cmd-manual" class="cmd-move-pane" style="display:none">
+            <div class="wasd-grid">
+              <button class="wasd" data-key="forward">W</button>
+              <button class="wasd" data-key="left">A</button>
+              <button class="wasd" data-key="back">S</button>
+              <button class="wasd" data-key="right">D</button>
+              <button class="wasd" data-key="jump">Jump</button>
+              <button class="wasd" data-key="sneak">Sneak</button>
+              <button class="wasd" data-key="sprint">Sprint</button>
+            </div>
+            <button id="cmd-stop-move" class="btn btn-danger">Stop moving</button>
+          </div>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Chat / command</h3>
+          <div class="row">
+            <input id="cmd-chat" type="text" placeholder="/say hello or plain chat">
+            <button id="cmd-send" class="btn btn-primary">Send</button>
+          </div>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Attack</h3>
+          <div class="row">
+            <input id="cmd-attack-target" type="text" placeholder="entity name (blank = nearest)">
+            <button id="cmd-attack" class="btn btn-danger">Attack</button>
+          </div>
+        </div>
+
+        <div class="cmd-group">
+          <h3>Autoclicker</h3>
+          <div class="row">
+            <label class="narrow">Mode
+              <select id="cmd-click-mode">
+                <option value="left">Left (attack)</option>
+                <option value="right">Right (use)</option>
+              </select>
+            </label>
+            <label class="narrow">Interval (ms)<input id="cmd-click-interval" type="number" min="20" value="200"></label>
+            <button id="cmd-click-start" class="btn btn-primary">Start</button>
+            <button id="cmd-click-stop" class="btn btn-danger">Stop</button>
+          </div>
+        </div>
+      </section>
+
       <section class="log-panel">
         <div class="log-header">
           <h2>Activity Log</h2>

@@ -318,3 +318,16 @@ input:focus, select:focus { outline: none; border-color: var(--blue); }
   flex-shrink: 0;
 }
 .auth-banner-dismiss:hover { color: var(--text); }
+
+/* Command panel */
+.command-panel { background: #1b1f27; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.command-panel h2 { margin: 0 0 12px; }
+.cmd-group { border-top: 1px solid #2a2f3a; padding-top: 12px; margin-top: 12px; }
+.cmd-group h3 { margin: 0 0 8px; font-size: 0.9rem; color: #aab; }
+.cmd-selector-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cmd-bot-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.cmd-bot-item { display: flex; align-items: center; gap: 4px; background: #232834; padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; }
+.cmd-move-mode { display: flex; gap: 16px; margin-bottom: 8px; }
+.wasd-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.wasd { background: #2a2f3a; border: 1px solid #3a4150; color: #ddd; padding: 8px 14px; border-radius: 6px; cursor: pointer; user-select: none; }
+.wasd:active { background: #3a4150; }

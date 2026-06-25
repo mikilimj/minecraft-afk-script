@@ -156,6 +156,7 @@ function renderAccounts() {
   const list = document.getElementById('account-list');
   list.innerHTML = '';
   for (const acc of config.accounts) list.appendChild(renderAccountCard(acc));
+  renderBotSelector();
 }
 
 // ── SECTION OVERRIDE BLOCK ────────────────────────────────────────────────────
@@ -395,6 +396,86 @@ document.getElementById('btn-add').onclick = async () => {
 };
 document.getElementById('btn-start-all').onclick = () => fetch('/api/bot/start-all', { method: 'POST' });
 document.getElementById('btn-stop-all').onclick  = () => fetch('/api/bot/stop-all',  { method: 'POST' });
+
+// ── COMMAND PANEL ───────────────────────────────────────────────────────────────
+function renderBotSelector() {
+  const list = document.getElementById('cmd-bot-list');
+  if (!list) return;
+  const prev = selectedIds();
+  list.innerHTML = '';
+  for (const acc of config.accounts) {
+    const id = document.createElement('label');
+    id.className = 'cmd-bot-item';
+    const checked = prev.includes(acc.id) ? ' checked' : '';
+    id.innerHTML = `<input type="checkbox" class="cmd-bot-chk" value="${escapeAttr(acc.id)}"${checked}> ${escapeHtml(acc.name)}`;
+    list.appendChild(id);
+  }
+}
+
+function selectedIds() {
+  return Array.from(document.querySelectorAll('.cmd-bot-chk:checked')).map((c) => c.value);
+}
+
+async function sendCommand(action, params = {}) {
+  const ids = selectedIds();
+  if (ids.length === 0) { appendLog(null, 'warn', 'No bots selected.'); return; }
+  await fetch('/api/bot/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, action, params }),
+  });
+}
+
+function wireCommandPanel() {
+  document.getElementById('cmd-select-all').onclick = () =>
+    document.querySelectorAll('.cmd-bot-chk').forEach((c) => { c.checked = true; });
+  document.getElementById('cmd-clear-all').onclick = () =>
+    document.querySelectorAll('.cmd-bot-chk').forEach((c) => { c.checked = false; });
+
+  document.querySelectorAll('input[name="move-mode"]').forEach((r) => {
+    r.addEventListener('change', () => {
+      const manual = document.querySelector('input[name="move-mode"]:checked').value === 'manual';
+      document.getElementById('cmd-manual').style.display = manual ? '' : 'none';
+      document.getElementById('cmd-pathfind').style.display = manual ? 'none' : '';
+    });
+  });
+
+  document.getElementById('cmd-go').onclick = () => sendCommand('gotoXYZ', {
+    x: parseFloat(document.getElementById('cmd-x').value) || 0,
+    y: parseFloat(document.getElementById('cmd-y').value) || 0,
+    z: parseFloat(document.getElementById('cmd-z').value) || 0,
+  });
+
+  document.querySelectorAll('.wasd').forEach((btn) => {
+    const key = btn.dataset.key;
+    const down = () => sendCommand('control', { key, state: true });
+    const up   = () => sendCommand('control', { key, state: false });
+    btn.addEventListener('mousedown', down);
+    btn.addEventListener('mouseup', up);
+    btn.addEventListener('mouseleave', up);
+  });
+  document.getElementById('cmd-stop-move').onclick = () => sendCommand('clearControls', {});
+
+  document.getElementById('cmd-send').onclick = () => {
+    const text = document.getElementById('cmd-chat').value;
+    if (text) { sendCommand('chat', { text }); document.getElementById('cmd-chat').value = ''; }
+  };
+  document.getElementById('cmd-chat').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('cmd-send').click();
+  });
+
+  document.getElementById('cmd-attack').onclick = () =>
+    sendCommand('attack', { target: document.getElementById('cmd-attack-target').value.trim() || undefined });
+
+  document.getElementById('cmd-click-start').onclick = () => sendCommand('autoclick', {
+    on: true,
+    mode: document.getElementById('cmd-click-mode').value,
+    intervalMs: parseInt(document.getElementById('cmd-click-interval').value, 10) || 200,
+  });
+  document.getElementById('cmd-click-stop').onclick = () => sendCommand('autoclick', { on: false });
+}
+
+wireCommandPanel();
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 loadConfig();
