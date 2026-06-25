@@ -21,6 +21,7 @@ class BotRunner {
     this._status = 'idle';
     this.antiAfkInterval = null;
     this.reconnectTimeout = null;
+    this.autoclickInterval = null;
     this.state = {
       phase: 'LOBBY', loggedIn: false, seenLobby: false,
       onTargetServer: false, atPosition: false, transferTimeout: null,
@@ -47,6 +48,89 @@ class BotRunner {
 
   clearAntiAfk() {
     if (this.antiAfkInterval) { clearInterval(this.antiAfkInterval); this.antiAfkInterval = null; }
+  }
+
+  // ── COMMANDS ──────────────────────────────────────────────────────────────────
+  command(action, params = {}) {
+    switch (action) {
+      case 'chat':          this.chat(params.text); break;
+      case 'gotoXYZ':       this.gotoXYZ(params.x, params.y, params.z); break;
+      case 'control':       this.setControl(params.key, params.state); break;
+      case 'clearControls': this.clearControls(); break;
+      case 'attack':        this.attackNearest(params.target); break;
+      case 'autoclick':
+        if (params.on) this.startAutoclick(params.mode, params.intervalMs);
+        else this.stopAutoclick();
+        break;
+      default: throw new Error(`unknown action: ${action}`);
+    }
+  }
+
+  chat(text) { if (this.bot && text) this.bot.chat(String(text)); }
+
+  setControl(key, state) {
+    const allowed = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'];
+    if (this.bot && allowed.includes(key)) this.bot.setControlState(key, !!state);
+  }
+
+  clearControls() {
+    if (!this.bot) return;
+    for (const k of ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']) {
+      this.bot.setControlState(k, false);
+    }
+  }
+
+  gotoXYZ(x, y, z) {
+    if (!this.bot) return;
+    try {
+      const mcData    = this.bot.registry || require('minecraft-data')(this.bot.version);
+      const movements = new Movements(this.bot, mcData);
+      movements.canDig = false;
+      this.bot.pathfinder.setMovements(movements);
+      this.bot.pathfinder.setGoal(new GoalXYZ(Number(x), Number(y), Number(z)));
+      this.log('info', `Command: navigating to X:${x} Y:${y} Z:${z}`);
+    } catch (err) {
+      this.log('error', `goto error: ${err.message}`);
+    }
+  }
+
+  attackNearest(targetName) {
+    if (!this.bot) return;
+    const match = targetName
+      ? (e) => e.name === targetName || e.username === targetName
+      : (e) => e.type === 'mob' || e.type === 'player' || e.type === 'hostile';
+    const entity = this.bot.nearestEntity(match);
+    if (!entity) { this.log('warn', 'Command: no entity to attack.'); return; }
+    try {
+      this.bot.lookAt(entity.position.offset(0, entity.height ?? 1, 0));
+      this.bot.attack(entity);
+    } catch (err) { this.log('error', `attack error: ${err.message}`); }
+  }
+
+  startAutoclick(mode = 'left', intervalMs = 200) {
+    this.stopAutoclick();
+    const interval = Math.max(20, parseInt(intervalMs, 10) || 200);
+    this.log('info', `Autoclicker started (${mode}, ${interval}ms).`);
+    this.autoclickInterval = setInterval(() => {
+      if (!this.bot) return;
+      try {
+        if (mode === 'right') {
+          this.bot.activateItem();
+        } else {
+          this.bot.swingArm('right');
+          const entity = this.bot.nearestEntity((e) => e.type === 'mob' || e.type === 'player' || e.type === 'hostile');
+          if (entity) this.bot.attack(entity);
+        }
+      } catch (_) { /* swing on empty world is harmless */ }
+    }, interval);
+  }
+
+  stopAutoclick() {
+    if (this.autoclickInterval) {
+      clearInterval(this.autoclickInterval);
+      this.autoclickInterval = null;
+      this.log('info', 'Autoclicker stopped.');
+    }
   }
 
   // ── RECONNECT ─────────────────────────────────────────────────────────────────
@@ -138,6 +222,7 @@ class BotRunner {
     clearTimeout(this.reconnectTimeout);
     this.reconnectTimeout = null;
     this.clearAntiAfk();
+    this.stopAutoclick();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
     if (this.bot) { try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {} this.bot = null; }
