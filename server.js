@@ -61,6 +61,7 @@ function makeRunner(account) {
     log: accountLog(account.id),
     setStatus: (state) => broadcast('status', { accountId: account.id, state }),
     msaQueue,
+    onInventory: (slots) => broadcast('inventory', { accountId: account.id, slots }),
   });
 }
 
@@ -114,6 +115,7 @@ app.post('/api/accounts', (req, res) => {
 app.delete('/api/accounts/:id', (req, res) => {
   const r = runners.get(req.params.id);
   if (r) { r.stop(); runners.delete(req.params.id); }
+  viewerPorts.delete(req.params.id);
   CONFIG.accounts = CONFIG.accounts.filter((a) => a.id !== req.params.id);
   saveConfigFile(CONFIG);
   res.json({ ok: true });
@@ -151,6 +153,32 @@ app.post('/api/bot/start-all', (_req, res) => {
 app.post('/api/bot/stop-all', (_req, res) => {
   for (const r of runners.values()) r.stop();
   res.json({ ok: true });
+});
+
+app.post('/api/bot/view/:id', (req, res) => {
+  const r = runners.get(req.params.id);
+  if (!r || r.status === 'idle') return res.status(409).json({ error: 'bot not running' });
+  const port = allocateViewerPort(viewerPorts, req.params.id);
+  r.startViewer(port, !!req.body?.firstPerson);
+  res.json({ port });
+});
+
+app.delete('/api/bot/view/:id', (req, res) => {
+  const r = runners.get(req.params.id);
+  if (r) r.stopViewer();
+  res.json({ ok: true });
+});
+
+app.post('/api/bot/command', (req, res) => {
+  const { ids = [], action, params = {} } = req.body ?? {};
+  const results = [];
+  for (const id of ids) {
+    const r = runners.get(id);
+    if (!r || r.status === 'idle') { results.push({ id, ok: false, reason: 'not running' }); continue; }
+    try { r.command(action, params); results.push({ id, ok: true }); }
+    catch (e) { results.push({ id, ok: false, reason: e.message }); }
+  }
+  res.json({ results });
 });
 
 app.post('/api/auth/skip', (_req, res) => { msaQueue.skip(); res.json({ ok: true }); });

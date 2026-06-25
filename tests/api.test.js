@@ -49,3 +49,22 @@ test('start/stop unknown account id returns ok:false', async () => {
   const res = await request(app).post('/api/bot/start/nope');
   expect(res.body.ok).toBe(false);
 });
+
+test('POST /api/bot/view/:id returns 409 when not running', async () => {
+  const add = await request(app).post('/api/accounts').send({ name: 'ViewBot' });
+  const id = add.body.account.id;
+  const res = await request(app).post(`/api/bot/view/${id}`).send({});
+  expect(res.status).toBe(409);
+});
+
+test('POST /api/bot/command skips ids that are not running', async () => {
+  const res = await request(app).post('/api/bot/command')
+    .send({ ids: ['nope'], action: 'chat', params: { text: 'hi' } });
+  expect(res.status).toBe(200);
+  expect(res.body.results).toEqual([{ id: 'nope', ok: false, reason: 'not running' }]);
+});
+
+test('DELETE /api/bot/view/:id is ok even when no viewer', async () => {
+  const res = await request(app).delete('/api/bot/view/nope');
+  expect(res.body.ok).toBe(true);
+});
