@@ -190,6 +190,7 @@ function serverFieldsHtml(acc) {
 
 function positionFieldsHtml(acc) {
   return `
+    <label><input type="checkbox" class="acc-position-enabled"${acc.position?.enabled ? ' checked' : ''}> Enabled</label>
     <div class="row three">
       <label>X<input class="acc-pos-x" type="number" step="0.1" value="${escapeAttr(acc.position?.x)}"></label>
       <label>Y<input class="acc-pos-y" type="number" step="0.1" value="${escapeAttr(acc.position?.y)}"></label>
@@ -203,11 +204,13 @@ function positionFieldsHtml(acc) {
 
 function antiAfkFieldsHtml(acc) {
   return `
+    <label><input type="checkbox" class="acc-antiafk-enabled"${acc.antiAfk?.enabled !== false ? ' checked' : ''}> Enabled</label>
     <label>Interval (ms)<input class="acc-antiafk-interval" type="number" min="1000" step="1000" value="${escapeAttr(acc.antiAfk?.interval)}"></label>`;
 }
 
 function reconnectFieldsHtml(acc) {
   return `
+    <label><input type="checkbox" class="acc-reconnect-enabled"${acc.reconnect?.enabled !== false ? ' checked' : ''}> Enabled</label>
     <label>Delay (seconds)<input class="acc-reconnect-delay" type="number" min="1" max="3600" value="${escapeAttr(acc.reconnect?.delaySeconds)}"></label>`;
 }
 
