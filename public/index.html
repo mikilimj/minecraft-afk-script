@@ -12,11 +12,6 @@
   <header>
     <div class="header-left">
       <h1>Minecraft AFK Bot</h1>
-      <span id="status-badge" class="badge idle">● Idle</span>
-    </div>
-    <div class="header-right">
-      <button id="btn-connect" class="btn btn-primary">Connect</button>
-      <button id="btn-disconnect" class="btn btn-danger" disabled>Disconnect</button>
     </div>
   </header>
 
@@ -24,24 +19,12 @@
     <section class="settings-panel">
 
       <div class="section-group">
-        <h3>Server</h3>
+        <h3>Server (Global Defaults)</h3>
         <div class="row">
           <label>Host<input id="host" type="text" placeholder="play.example.com"></label>
           <label class="narrow">Port<input id="port" type="number" min="1" max="65535"></label>
         </div>
         <label>Version<input id="version" type="text"></label>
-      </div>
-
-      <div class="section-group">
-        <h3>Account</h3>
-        <label>Username / Email<input id="username" type="text"></label>
-        <label>Auth type
-          <select id="auth">
-            <option value="offline">Offline (cracked)</option>
-            <option value="microsoft">Microsoft (premium)</option>
-          </select>
-        </label>
-        <label>Password (for /login)<input id="password" type="password" placeholder="Leave empty to skip"></label>
       </div>
 
       <div class="section-group">
@@ -89,20 +72,39 @@
 
     </section>
 
-    <section class="log-panel">
-      <div class="log-header">
-        <h2>Activity Log</h2>
-        <button id="btn-clear-log" class="btn btn-ghost">Clear</button>
-      </div>
-      <div id="auth-banner" class="auth-banner" style="display:none">
-        <div class="auth-banner-body">
-          <div class="auth-banner-title">Microsoft login required</div>
-          <div class="auth-banner-code" id="auth-code"></div>
-          <a id="auth-link" href="#" target="_blank" class="btn btn-primary auth-banner-btn">Open Microsoft login</a>
+    <section class="accounts-log-column">
+
+      <section class="accounts-panel">
+        <div class="accounts-header">
+          <h2>Accounts</h2>
+          <div>
+            <button id="btn-add" class="btn btn-ghost">Add account</button>
+            <button id="btn-start-all" class="btn btn-primary">Start all</button>
+            <button id="btn-stop-all" class="btn btn-danger">Stop all</button>
+          </div>
         </div>
-        <button id="auth-dismiss" class="auth-banner-dismiss">×</button>
-      </div>
-      <div id="log" class="log-entries"></div>
+        <div id="account-list"></div>
+      </section>
+
+      <section class="log-panel">
+        <div class="log-header">
+          <h2>Activity Log</h2>
+          <button id="btn-clear-log" class="btn btn-ghost">Clear</button>
+        </div>
+        <div id="auth-banner" class="auth-banner" style="display:none">
+          <div class="auth-banner-body">
+            <div class="auth-banner-title">Microsoft login required — <span id="auth-account"></span></div>
+            <div class="auth-banner-code" id="auth-code"></div>
+            <div class="auth-banner-actions">
+              <a id="auth-link" href="#" target="_blank" class="btn btn-primary auth-banner-btn">Open Microsoft login</a>
+              <button id="auth-skip" class="btn btn-ghost">Skip</button>
+            </div>
+          </div>
+          <button id="auth-dismiss" class="auth-banner-dismiss">×</button>
+        </div>
+        <div id="log" class="log-entries"></div>
+      </section>
+
     </section>
   </main>
 
