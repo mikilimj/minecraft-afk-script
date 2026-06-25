@@ -36,6 +36,15 @@ test('POST /api/config rejects bad port in global', async () => {
   expect(res.status).toBe(400);
 });
 
+test('POST /api/config rejects bad port in account override', async () => {
+  const res = await request(app).post('/api/config').send({
+    global: { server: { host: 'h', port: 25565, version: '1.21' }, reconnect: { delaySeconds: 30 } },
+    accounts: [{ name: 'Bad', overrides: { server: true }, server: { host: 'h', port: 0, version: '1.21' } }],
+  });
+  expect(res.status).toBe(400);
+  expect(res.body.error).toMatch(/server\.port/);
+});
+
 test('start/stop unknown account id returns ok:false', async () => {
   const res = await request(app).post('/api/bot/start/nope');
   expect(res.body.ok).toBe(false);

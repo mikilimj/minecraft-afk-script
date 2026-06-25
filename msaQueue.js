@@ -33,8 +33,8 @@ class MicrosoftAuthQueue {
   skip() {
     if (!this._activeId) return;
     const skipped = this._activeId;
-    this._onSkip(skipped);
-    this._activate();
+    this._activate();          // advance first so remove() in stop() is a no-op
+    this._onSkip(skipped);   // stop() → remove() → else branch → filter (no-op)
   }
 }
 

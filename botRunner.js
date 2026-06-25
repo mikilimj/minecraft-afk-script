@@ -213,7 +213,7 @@ class BotRunner {
         this.state.seenLobby = true;
         this.state.phase     = 'LOBBY';
         this._setStatus('connected');
-        if (this.msaQueue) this.msaQueue.complete(this.accountId);
+        if (this.msaQueue && this.config.auth === 'microsoft') this.msaQueue.complete(this.accountId);
         if (this.config.auth === 'microsoft') {
           this.log('info', 'Microsoft login — moving to target server...');
           this.state.loggedIn = true;

@@ -62,6 +62,20 @@ function validateGlobal(global) {
   return null;
 }
 
+function validateAccount(account) {
+  if (account.overrides?.server) {
+    const port = parseInt(account.server?.port, 10);
+    if (isNaN(port) || port < 1 || port > 65535)
+      return `account "${account.name}": server.port must be 1–65535`;
+  }
+  if (account.overrides?.reconnect) {
+    const delay = parseInt(account.reconnect?.delaySeconds, 10);
+    if (isNaN(delay) || delay < 1 || delay > 3600)
+      return `account "${account.name}": reconnect.delaySeconds must be 1–3600`;
+  }
+  return null;
+}
+
 // ── REST API ─────────────────────────────────────────────────────────────────
 app.get('/api/config', (_req, res) => res.json(CONFIG));
 
@@ -69,6 +83,10 @@ app.post('/api/config', (req, res) => {
   const body = req.body ?? {};
   const err = validateGlobal(body.global);
   if (err) return res.status(400).json({ error: err });
+  for (const account of (body.accounts ?? [])) {
+    const accErr = validateAccount(account);
+    if (accErr) return res.status(400).json({ error: accErr });
+  }
   CONFIG = normalizeConfig(body);
   saveConfigFile(CONFIG);
   res.json({ ok: true });
