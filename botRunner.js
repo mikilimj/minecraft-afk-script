@@ -9,12 +9,14 @@ const BLOCKED_TRANSFER_PACKETS = new Set([
 ]);
 
 class BotRunner {
-  constructor({ config, profilesFolder, log, setStatus, onAuth }) {
+  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue }) {
+    this.accountId = accountId;
+    this.name = name;
     this.config = config;
     this.profilesFolder = profilesFolder;
     this.log = log;
     this._setStatusCb = setStatus;
-    this.onAuth = onAuth || (() => {});
+    this.msaQueue = msaQueue || null;
     this.bot = null;
     this._status = 'idle';
     this.antiAfkInterval = null;
@@ -139,6 +141,7 @@ class BotRunner {
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
     if (this.bot) { try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {} this.bot = null; }
+    if (this.msaQueue) this.msaQueue.remove(this.accountId);
     this._setStatus('idle');
     this.log('info', 'Bot stopped.');
   }
@@ -165,7 +168,11 @@ class BotRunner {
       onMsaCode: (data) => {
         this.log('warn', `Microsoft auth required — visit: ${data.verification_uri}`);
         this.log('warn', `Enter code: ${data.user_code}`);
-        this.onAuth({ verification_uri: data.verification_uri, user_code: data.user_code });
+        if (this.msaQueue) {
+          this.msaQueue.request(this.accountId, this.name, {
+            verification_uri: data.verification_uri, user_code: data.user_code,
+          });
+        }
       },
     });
 
@@ -206,6 +213,7 @@ class BotRunner {
         this.state.seenLobby = true;
         this.state.phase     = 'LOBBY';
         this._setStatus('connected');
+        if (this.msaQueue) this.msaQueue.complete(this.accountId);
         if (this.config.auth === 'microsoft') {
           this.log('info', 'Microsoft login — moving to target server...');
           this.state.loggedIn = true;
