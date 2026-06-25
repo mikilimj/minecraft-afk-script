@@ -1,3 +1,7 @@
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+process.env.AFK_CACHE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'afk-test-'));
 const request = require('supertest');
 const { app } = require('../server');
 

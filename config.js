@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { _error } = require('./util');
 
-const CACHE_DIR   = path.join(__dirname, 'cache');
+const CACHE_DIR   = process.env.AFK_CACHE_DIR || path.join(__dirname, 'cache');
 const CONFIG_FILE = path.join(CACHE_DIR, 'config.json');
 
 const DEFAULT_CONFIG = {
@@ -79,7 +79,8 @@ function makeAccount(partial = {}) {
   };
 }
 
-function normalizeGlobal(g = {}) {
+function normalizeGlobal(g) {
+  g = g || {};
   return {
     server: { ...DEFAULT_GLOBAL.server, ...(g.server ?? {}) },
     position: { ...DEFAULT_GLOBAL.position, ...(g.position ?? {}) },
