@@ -19,6 +19,8 @@ class BotRunner {
     this.msaQueue = msaQueue || null;
     this.bot = null;
     this._status = 'idle';
+    this._viewerPort = null;
+    this._viewerFirstPerson = false;
     this.antiAfkInterval = null;
     this.reconnectTimeout = null;
     this.autoclickInterval = null;
@@ -133,6 +135,43 @@ class BotRunner {
     }
   }
 
+  // ── 3D VIEWER ─────────────────────────────────────────────────────────────────
+  startViewer(port, firstPerson = false) {
+    const modeChanged = this._viewerFirstPerson !== !!firstPerson;
+    this._viewerPort = port;
+    this._viewerFirstPerson = !!firstPerson;
+    if (modeChanged && this.bot && this.bot.viewer) {
+      try { this.bot.viewer.close(); } catch (_) {}
+      this.bot.viewer = null;
+    }
+    this._attachViewer();
+  }
+
+  _attachViewer() {
+    if (this._viewerPort == null) return;
+    if (!this.bot || !this.bot.entity) return;   // viewer needs a spawned entity
+    if (this.bot.viewer) return;                 // already attached
+    try {
+      const { mineflayer: mineflayerViewer } = require('prismarine-viewer');
+      mineflayerViewer(this.bot, {
+        port: this._viewerPort,
+        firstPerson: this._viewerFirstPerson,
+        viewDistance: 6,
+      });
+      this.log('info', `3D view started on port ${this._viewerPort}.`);
+    } catch (err) {
+      this.log('error', `Viewer error: ${err.message}`);
+    }
+  }
+
+  stopViewer() {
+    this._viewerPort = null;
+    if (this.bot && this.bot.viewer) {
+      try { this.bot.viewer.close(); } catch (_) {}
+      this.bot.viewer = null;
+    }
+  }
+
   // ── RECONNECT ─────────────────────────────────────────────────────────────────
   scheduleReconnect() {
     this.clearAntiAfk();
@@ -225,7 +264,11 @@ class BotRunner {
     this.stopAutoclick();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
-    if (this.bot) { try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {} this.bot = null; }
+    if (this.bot) {
+      try { this.bot.viewer && this.bot.viewer.close(); } catch (_) {}
+      try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {}
+      this.bot = null;
+    }
     if (this.msaQueue) this.msaQueue.remove(this.accountId);
     this._setStatus('idle');
     this.log('info', 'Bot stopped.');
@@ -233,7 +276,11 @@ class BotRunner {
 
   // ── START BOT ─────────────────────────────────────────────────────────────────
   async start() {
-    if (this.bot) { try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {} this.bot = null; }
+    if (this.bot) {
+      try { this.bot.viewer && this.bot.viewer.close(); } catch (_) {}
+      try { this.bot.removeAllListeners(); this.bot.quit(); } catch (_) {}
+      this.bot = null;
+    }
     this.clearAntiAfk();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
@@ -294,6 +341,7 @@ class BotRunner {
     });
 
     this.bot.on('spawn', () => {
+      this._attachViewer();
       if (!this.state.seenLobby) {
         this.state.seenLobby = true;
         this.state.phase     = 'LOBBY';
