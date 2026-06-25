@@ -25,3 +25,7 @@ async function open() {
 fpChk.addEventListener('change', open);
 setTitle();
 if (id) open(); else msg.textContent = 'No bot id in URL.';
+
+window.addEventListener('beforeunload', () => {
+  if (id) fetch(`/api/bot/view/${id}`, { method: 'DELETE', keepalive: true });
+});

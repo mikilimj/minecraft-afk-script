@@ -509,6 +509,8 @@ function wireCommandPanel() {
     intervalMs: parseInt(document.getElementById('cmd-click-interval').value, 10) || 200,
   });
   document.getElementById('cmd-click-stop').onclick = () => sendCommand('autoclick', { on: false });
+
+  window.addEventListener('blur', () => { if (selectedIds().length) sendCommand('clearControls', {}); });
 }
 
 wireCommandPanel();
@@ -524,7 +526,8 @@ function applyInventory(accountId, slots) {
 
 function renderInventoryGrid(slots) {
   const cells = [];
-  for (let i = 0; i < 36; i++) {
+  // slots 9–35 = main inventory, slots 36–44 = hotbar (mineflayer window slot numbering)
+  for (let i = 9; i <= 44; i++) {
     const item = (slots || [])[i];
     if (item) {
       cells.push(`<div class="inv-cell filled" title="${escapeAttr(item.displayName || item.name)}">` +

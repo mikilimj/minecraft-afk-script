@@ -187,6 +187,7 @@ class BotRunner {
   // ── RECONNECT ─────────────────────────────────────────────────────────────────
   scheduleReconnect() {
     this.clearAntiAfk();
+    this.stopAutoclick();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
     if (this.reconnectTimeout) return;
