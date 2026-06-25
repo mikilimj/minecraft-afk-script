@@ -1,15 +1,9 @@
-const mineflayer = require('mineflayer');
-const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
-const GoalXYZ = goals.GoalXYZ;
-const fs = require('fs');
 const path = require('path');
-const net = require('net');
-const dns = require('dns').promises;
 const http = require('http');
 const express = require('express');
 const { WebSocketServer, WebSocket } = require('ws');
 
-const { extractChatText, resolveServerAddress, installConsoleFilter, _log, _warn, _error } = require('./util');
+const { resolveServerAddress, installConsoleFilter, _log, _warn, _error } = require('./util');
 installConsoleFilter();
 const { BotRunner } = require('./botRunner');
 
@@ -70,7 +64,7 @@ app.post('/api/config', (req, res) => {
 app.post('/api/bot/start', (_req, res) => {
   if (runner && runner.status !== 'idle') return res.json({ ok: false, reason: 'already running' });
   runner = makeRunner();
-  runner.start().catch((err) => { log('error', `Failed to start bot: ${err.message}`); setStatus('idle'); });
+  runner.start().catch((err) => { log('error', `Failed to start bot: ${err.message}`); runner._status = 'idle'; setStatus('idle'); });
   res.json({ ok: true });
 });
 
