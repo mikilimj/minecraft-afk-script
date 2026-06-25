@@ -331,3 +331,15 @@ input:focus, select:focus { outline: none; border-color: var(--blue); }
 .wasd-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .wasd { background: #2a2f3a; border: 1px solid #3a4150; color: #ddd; padding: 8px 14px; border-radius: 6px; cursor: pointer; user-select: none; }
 .wasd:active { background: #3a4150; }
+
+/* Inventory grid */
+.inv-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
+.inv-cell { aspect-ratio: 1; background: #20242d; border: 1px solid #2a2f3a; border-radius: 4px; position: relative; font-size: 0.55rem; overflow: hidden; }
+.inv-cell.filled { background: #2b3340; }
+.inv-name { position: absolute; top: 2px; left: 2px; right: 2px; color: #cdd; line-height: 1.05; }
+.inv-count { position: absolute; bottom: 1px; right: 3px; color: #fff; font-weight: 600; }
+/* 3D view */
+.viewer-group .view-toggle, .viewer-group .view-popout { margin-left: 8px; font-size: 0.8rem; }
+.view-mode { margin-left: 8px; font-size: 0.8rem; }
+.viewer-holder:empty { display: none; }
+.viewer-frame { width: 100%; height: 320px; border: 1px solid #2a2f3a; border-radius: 6px; margin-top: 8px; }

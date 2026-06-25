@@ -1,6 +1,7 @@
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let config = { global: {}, accounts: [] };
 const statuses = {};   // accountId -> state string
+const inventories = {};   // accountId -> slots array
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function escapeHtml(str) {
@@ -41,9 +42,10 @@ function connectWS() {
   ws = new WebSocket(`ws://${location.host}`);
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.type === 'log')    appendLog(msg.accountId, msg.level, msg.text, msg.time);
-    if (msg.type === 'status') applyStatus(msg.accountId, msg.state);
-    if (msg.type === 'auth')   handleAuth(msg);
+    if (msg.type === 'log')       appendLog(msg.accountId, msg.level, msg.text, msg.time);
+    if (msg.type === 'status')    applyStatus(msg.accountId, msg.state);
+    if (msg.type === 'auth')      handleAuth(msg);
+    if (msg.type === 'inventory') applyInventory(msg.accountId, msg.slots);
   };
   ws.onclose = () => setTimeout(connectWS, 1000);
 }
@@ -249,6 +251,18 @@ function renderAccountCard(acc) {
       ${sectionHtml('AFK Position', 'position', positionFieldsHtml(acc))}
       ${sectionHtml('Anti-AFK', 'antiAfk', antiAfkFieldsHtml(acc))}
       ${sectionHtml('Auto-Reconnect', 'reconnect', reconnectFieldsHtml(acc))}
+      <div class="section-group viewer-group">
+        <h3>3D View
+          <button class="btn btn-ghost view-toggle" data-role="view-toggle">Open</button>
+          <label class="view-mode"><input type="checkbox" class="view-firstperson"> POV</label>
+          <a class="btn btn-ghost view-popout" href="view.html?id=${escapeAttr(acc.id)}" target="_blank">Pop out</a>
+        </h3>
+        <div class="viewer-holder" data-role="viewer-holder"></div>
+      </div>
+      <div class="section-group">
+        <h3>Inventory</h3>
+        <div class="inv-grid" data-role="inv-grid">${renderInventoryGrid(inventories[acc.id])}</div>
+      </div>
     </div>`;
   wireAccountCard(el, acc);
   return el;
@@ -299,6 +313,28 @@ function wireAccountCard(el, acc) {
     await fetch(`/api/accounts/${acc.id}`, { method: 'DELETE' });
     await loadConfig();
   };
+
+  // 3D view
+  const viewBtn = el.querySelector('[data-role="view-toggle"]');
+  const holder  = el.querySelector('[data-role="viewer-holder"]');
+  const fpChk   = el.querySelector('.view-firstperson');
+  let viewOpen = false;
+  async function openView() {
+    const res = await fetch(`/api/bot/view/${acc.id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstPerson: fpChk.checked }),
+    });
+    const data = await res.json();
+    if (!res.ok) { appendLog(acc.id, 'warn', data.error || 'Cannot open view'); return; }
+    holder.innerHTML = `<iframe class="viewer-frame" src="http://${location.hostname}:${data.port}/"></iframe>`;
+    viewOpen = true; viewBtn.textContent = 'Close';
+  }
+  async function closeView() {
+    await fetch(`/api/bot/view/${acc.id}`, { method: 'DELETE' });
+    holder.innerHTML = ''; viewOpen = false; viewBtn.textContent = 'Open';
+  }
+  viewBtn.onclick = () => (viewOpen ? closeView() : openView());
+  fpChk.addEventListener('change', () => { if (viewOpen) openView(); });   // re-open with new mode
 }
 
 function applyOverride(fieldsDiv, labelEl, isCustom) {
@@ -476,6 +512,30 @@ function wireCommandPanel() {
 }
 
 wireCommandPanel();
+
+// ── INVENTORY ───────────────────────────────────────────────────────────────────
+function applyInventory(accountId, slots) {
+  inventories[accountId] = slots;
+  const card = document.querySelector(`.account-card[data-id="${CSS.escape(accountId)}"]`);
+  if (!card) return;
+  const grid = card.querySelector('[data-role="inv-grid"]');
+  if (grid) grid.innerHTML = renderInventoryGrid(slots);
+}
+
+function renderInventoryGrid(slots) {
+  const cells = [];
+  for (let i = 0; i < 36; i++) {
+    const item = (slots || [])[i];
+    if (item) {
+      cells.push(`<div class="inv-cell filled" title="${escapeAttr(item.displayName || item.name)}">` +
+        `<span class="inv-name">${escapeHtml((item.name || '').replace(/_/g, ' '))}</span>` +
+        `<span class="inv-count">${item.count}</span></div>`);
+    } else {
+      cells.push('<div class="inv-cell"></div>');
+    }
+  }
+  return cells.join('');
+}
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 loadConfig();
