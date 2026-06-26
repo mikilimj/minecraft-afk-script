@@ -323,12 +323,14 @@ input:focus, select:focus { outline: none; border-color: var(--blue); }
 .viewer-group .view-toggle, .viewer-group .view-popout { font-size: 0.8rem; }
 .view-mode { flex-direction: row; align-items: center; gap: 4px; font-size: 0.8rem; }
 .viewer-holder:empty { display: none; }
+.view-hint { font-size: 0.7rem; color: var(--muted); margin: 6px 0 0; line-height: 1.4; }
 .viewer-frame { width: 100%; height: 340px; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; }
 
 /* ── INVENTORY GRID ──────────────────────────────────────────────────────── */
 .inv-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 3px; }
 .inv-cell { aspect-ratio: 1; background: #20242d; border: 1px solid var(--border); border-radius: 4px; position: relative; font-size: 0.55rem; overflow: hidden; }
 .inv-cell.filled { background: #2b3340; }
+.inv-icon { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); object-fit: contain; image-rendering: pixelated; }
 .inv-name { position: absolute; top: 2px; left: 2px; right: 2px; color: #cdd; line-height: 1.05; }
 .inv-count { position: absolute; bottom: 1px; right: 3px; color: #fff; font-weight: 600; }
 .inv-grid.mini { gap: 2px; }

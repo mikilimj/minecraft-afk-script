@@ -37,6 +37,8 @@ class BotRunner {
   get status() { return this._status; }
   _setStatus(s) { this._status = s; this._setStatusCb(s); }
 
+  currentInventory() { return snapshotInventory(this.bot); }
+
   _emitInventory() {
     if (!this._onInventory || this._invThrottle) return;
     this._invThrottle = setTimeout(() => {

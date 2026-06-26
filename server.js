@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const express = require('express');
@@ -25,6 +26,22 @@ function allocateViewerPort(map, accountId, base = VIEWER_PORT_BASE) {
   return port;
 }
 
+// prismarine-viewer ships per-version item/block PNGs we can reuse for inventory icons.
+const VIEWER_TEX = path.join(path.dirname(require.resolve('prismarine-viewer')), 'public', 'textures');
+
+// Resolve a textures folder: prefer the configured version, else the newest shipped one.
+function iconDir() {
+  const want = CONFIG.global?.server?.version;
+  if (want && fs.existsSync(path.join(VIEWER_TEX, want, 'items'))) return path.join(VIEWER_TEX, want);
+  let versions = [];
+  try {
+    versions = fs.readdirSync(VIEWER_TEX, { withFileTypes: true })
+      .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  } catch (_) { /* ignore */ }
+  const latest = versions[versions.length - 1];
+  return latest ? path.join(VIEWER_TEX, latest) : VIEWER_TEX;
+}
+
 // ── EXPRESS + WEBSOCKET ──────────────────────────────────────────────────────
 const app    = express();
 const server = http.createServer(app);
@@ -37,6 +54,19 @@ function broadcast(type, payload) {
   const msg = JSON.stringify({ type, ...payload });
   wss.clients.forEach((c) => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
 }
+
+// Push current state to a freshly connected client so a page reload doesn't
+// sit on stale defaults (status, inventory, pending auth) until the next change.
+wss.on('connection', (ws) => {
+  const sendTo = (type, payload) => ws.send(JSON.stringify({ type, ...payload }));
+  for (const [id, r] of runners) {
+    sendTo('status', { accountId: id, state: r.status });
+    const slots = r.currentInventory();
+    if (slots && slots.some(Boolean)) sendTo('inventory', { accountId: id, slots });
+  }
+  const a = msaQueue.active;
+  if (a) sendTo('auth', { active: true, ...a });
+});
 
 const msaQueue = new MicrosoftAuthQueue({
   broadcastActive: (p) => broadcast('auth', p ? { active: true, ...p } : { active: false }),
@@ -88,6 +118,18 @@ function validateAccount(account) {
   }
   return null;
 }
+
+// ── ITEM ICONS ───────────────────────────────────────────────────────────────
+app.get('/icons/:name', (req, res) => {
+  const name = req.params.name;                       // e.g. "diamond_pickaxe.png"
+  if (!/^[a-z0-9_]+\.png$/.test(name)) return res.sendStatus(404);
+  const base = iconDir();
+  for (const sub of ['items', 'blocks']) {
+    const file = path.join(base, sub, name);
+    if (file.startsWith(base) && fs.existsSync(file)) return res.sendFile(file);
+  }
+  res.sendStatus(404);
+});
 
 // ── REST API ─────────────────────────────────────────────────────────────────
 app.get('/api/config', (_req, res) => res.json(CONFIG));

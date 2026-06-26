@@ -4,9 +4,11 @@ class MicrosoftAuthQueue {
     this._onSkip = onSkip;
     this._queue = [];        // [{ accountId, name, verification_uri, user_code }]
     this._activeId = null;
+    this._active = null;     // full active entry (for snapshotting late-connecting clients)
   }
 
   get activeId() { return this._activeId; }
+  get active() { return this._active; }
 
   request(accountId, name, msaData) {
     if (this._queue.some((e) => e.accountId === accountId) || this._activeId === accountId) return;
@@ -17,6 +19,7 @@ class MicrosoftAuthQueue {
   _activate() {
     const next = this._queue.shift() || null;
     this._activeId = next ? next.accountId : null;
+    this._active = next;
     this._broadcastActive(next);
   }
 

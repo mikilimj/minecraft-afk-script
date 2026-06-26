@@ -156,8 +156,9 @@ function updateTabDot(accountId) {
 }
 
 async function showTab(target) {
-  // Free the 3D viewer when leaving an account tab.
+  // Free the 3D viewer and release any held movement keys when leaving an account tab.
   if (activeTab !== target && activeTab !== 'general' && activeTab !== 'new') {
+    clearBotControls(activeTab);
     await closeViewerFor(activeTab);
   }
   activeTab = target;
@@ -446,10 +447,11 @@ function renderAccountPanel(acc) {
         <div class="section-group viewer-group">
           <h3>3D View
             <button class="btn btn-ghost view-toggle" data-role="view-toggle">Open</button>
-            <label class="view-mode"><input type="checkbox" class="view-firstperson"> POV</label>
+            <label class="view-mode" title="First-person (POV) vs orbit / third-person"><input type="checkbox" class="view-firstperson"> First-person</label>
             <a class="btn btn-ghost view-popout" href="view.html?id=${escapeAttr(acc.id)}" target="_blank">Pop out</a>
           </h3>
           <div class="viewer-holder" data-role="viewer-holder"></div>
+          <p class="view-hint">WASD move · Space jump · Shift sneak · Ctrl sprint — drives this tab's bot. Click outside the 3D view if keys stop responding.</p>
         </div>
         <div class="section-group">
           <h3>Inventory</h3>
@@ -611,7 +613,9 @@ function renderInventoryGrid(slots) {
     const item = (slots || [])[i];
     if (item) {
       cells.push(`<div class="inv-cell filled" title="${escapeAttr(item.displayName || item.name)}">` +
-        `<span class="inv-name">${escapeHtml((item.name || '').replace(/_/g, ' '))}</span>` +
+        `<img class="inv-icon" src="/icons/${encodeURIComponent(item.name || '')}.png" alt="" ` +
+          `onerror="this.style.display='none';this.nextElementSibling.style.display='block'">` +
+        `<span class="inv-name" style="display:none">${escapeHtml((item.name || '').replace(/_/g, ' '))}</span>` +
         `<span class="inv-count">${escapeHtml(item.count)}</span></div>`);
     } else {
       cells.push('<div class="inv-cell"></div>');
@@ -619,6 +623,55 @@ function renderInventoryGrid(slots) {
   }
   return cells.join('');
 }
+
+// ── KEYBOARD BOT CONTROLS ───────────────────────────────────────────────────────
+// WASD (+ Space/Shift/Ctrl) drive the bot of the active account tab via the
+// command API. Cross-origin viewer iframe steals focus, so keep focus on the page.
+const KEY_MAP = {
+  KeyW: 'forward', KeyA: 'left', KeyS: 'back', KeyD: 'right',
+  Space: 'jump', ShiftLeft: 'sneak', ShiftRight: 'sneak', ControlLeft: 'sprint',
+};
+const heldKeys = new Set();   // e.code values currently pressed
+
+function controlTargetId() {
+  return (activeTab !== 'general' && activeTab !== 'new') ? activeTab : null;
+}
+
+function sendBotCommand(id, action, params = {}) {
+  if (!id) return;
+  fetch('/api/bot/command', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids: [id], action, params }),
+  }).catch(() => {});
+}
+function sendControl(id, key, state) { sendBotCommand(id, 'control', { key, state }); }
+function clearBotControls(id) { heldKeys.clear(); sendBotCommand(id, 'clearControls'); }
+
+function isTypingTarget(t) { return t && t.closest && t.closest('input,textarea,select,[contenteditable]'); }
+
+window.addEventListener('keydown', (e) => {
+  const key = KEY_MAP[e.code];
+  if (!key) return;
+  const id = controlTargetId();
+  if (!id || isTypingTarget(e.target)) return;
+  e.preventDefault();
+  if (heldKeys.has(e.code)) return;   // ignore auto-repeat
+  heldKeys.add(e.code);
+  sendControl(id, key, true);
+});
+
+window.addEventListener('keyup', (e) => {
+  const key = KEY_MAP[e.code];
+  if (!key || !heldKeys.has(e.code)) return;
+  heldKeys.delete(e.code);
+  const id = controlTargetId();
+  if (id) sendControl(id, key, false);
+});
+
+window.addEventListener('blur', () => {
+  const id = controlTargetId();
+  if (id) clearBotControls(id); else heldKeys.clear();
+});
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 loadConfig();
