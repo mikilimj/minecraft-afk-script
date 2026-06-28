@@ -3,102 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Minecraft AFK Bot</title>
+  <title>Mineflayer Control</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <div class="header-left">
-      <h1>Minecraft AFK Bot</h1>
+  <!-- Top bar (static) -->
+  <div class="topbar">
+    <div class="brand-mark"><i></i></div>
+    <div class="brand-text">
+      <span class="brand-title">Mineflayer Control</span>
+      <span class="brand-sub">webgui · v2.4</span>
     </div>
-  </header>
+    <div class="spacer"></div>
+    <div class="online-pill"><span class="dot"></span><span id="online-label">0 online · 0 total</span></div>
+    <button class="icon-btn" id="appearance-btn" title="Appearance" aria-label="Appearance">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2a10 10 0 0 1 7.07 17.07M12 2A10 10 0 0 0 4.93 19.07" stroke-dasharray="4 2"></path></svg>
+    </button>
+  </div>
 
-  <nav id="tab-bar"></nav>
+  <!-- Appearance panel mounts here -->
+  <div id="appearance-mount"></div>
 
-  <main id="content">
+  <!-- Tab strip -->
+  <div class="tabstrip" id="tabstrip"></div>
 
-    <!-- ── GENERAL TAB ─────────────────────────────────────────────────────── -->
-    <section id="general-panel" class="panel">
-      <div class="general-cols">
-
-        <section class="settings-panel">
-          <h2>General settings</h2>
-
-          <div class="section-group">
-            <h3>Server (Global Defaults)</h3>
-            <div class="row">
-              <label>Host<input id="host" type="text" placeholder="play.example.com"></label>
-              <label class="narrow">Port<input id="port" type="number" min="1" max="65535"></label>
-            </div>
-            <label>Version<input id="version" type="text"></label>
-          </div>
-
-          <div class="section-group">
-            <h3>AFK Position
-              <label class="toggle">
-                <input id="position-enabled" type="checkbox">
-                <span class="slider"></span>
-              </label>
-            </h3>
-            <div class="sub-fields">
-              <div class="row three">
-                <label>X<input id="pos-x" type="number" step="0.1"></label>
-                <label>Y<input id="pos-y" type="number" step="0.1"></label>
-                <label>Z<input id="pos-z" type="number" step="0.1"></label>
-              </div>
-              <div class="row two">
-                <label>Yaw<input id="pos-yaw" type="number" step="1"></label>
-                <label>Pitch<input id="pos-pitch" type="number" step="1"></label>
-              </div>
-            </div>
-          </div>
-
-          <div class="section-group">
-            <h3>Anti-AFK
-              <label class="toggle">
-                <input id="antiafk-enabled" type="checkbox">
-                <span class="slider"></span>
-              </label>
-            </h3>
-            <label>Interval (ms)<input id="antiafk-interval" type="number" min="1000" step="1000"></label>
-          </div>
-
-          <div class="section-group">
-            <h3>Auto-Reconnect
-              <label class="toggle">
-                <input id="reconnect-enabled" type="checkbox">
-                <span class="slider"></span>
-              </label>
-            </h3>
-            <label>Delay (seconds)<input id="reconnect-delay" type="number" min="1" max="3600"></label>
-          </div>
-
-          <button id="btn-save" class="btn btn-secondary">Save Settings</button>
-          <p id="save-msg" class="save-msg"></p>
-        </section>
-
-        <section class="preview-panel">
-          <div class="preview-header">
-            <h2>Accounts</h2>
-            <label class="preview-size-label">Preview size
-              <input id="preview-size" type="range" min="140" max="440" value="220">
-            </label>
-          </div>
-          <div id="preview-grid"></div>
-        </section>
-
-      </div>
-    </section>
-
-    <!-- ── ACCOUNT TAB (rendered dynamically) ──────────────────────────────── -->
-    <section id="account-panel" class="panel" hidden></section>
-
-    <!-- ── NEW ACCOUNT TAB (rendered dynamically) ──────────────────────────── -->
-    <section id="draft-panel" class="panel" hidden></section>
-
-  </main>
+  <!-- Workspace (settings + right pane) -->
+  <div class="workspace">
+    <div class="settings" id="settings"></div>
+    <div id="right-pane-mount" style="flex:1 1 auto;min-width:0;display:flex"></div>
+  </div>
 
   <script src="app.js"></script>
 </body>
