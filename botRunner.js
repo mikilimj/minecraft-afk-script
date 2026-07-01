@@ -10,7 +10,7 @@ const BLOCKED_TRANSFER_PACKETS = new Set([
 ]);
 
 class BotRunner {
-  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue, onInventory }) {
+  constructor({ accountId, name, config, profilesFolder, log, setStatus, msaQueue, onInventory, onTelemetry }) {
     this.accountId = accountId;
     this.name = name;
     this.config = config;
@@ -26,6 +26,9 @@ class BotRunner {
     this.reconnectTimeout = null;
     this.autoclickInterval = null;
     this._onInventory = onInventory || null;
+    this._onTelemetry = onTelemetry || null;
+    this._telemetryInterval = null;
+    this._startedAt = null;
     this._invThrottle = null;
     this._invWired = false;
     this.state = {
@@ -38,6 +41,51 @@ class BotRunner {
   _setStatus(s) { this._status = s; this._setStatusCb(s); }
 
   currentInventory() { return snapshotInventory(this.bot); }
+
+  // Live vitals/position/armor snapshot for the dashboard. Returns null until a
+  // bot entity has spawned, so the UI can show "offline" placeholders.
+  currentTelemetry() {
+    const bot = this.bot;
+    if (!bot || !bot.entity) return null;
+    const slots = (bot.inventory && Array.isArray(bot.inventory.slots)) ? bot.inventory.slots : [];
+    const armorAt = (i) => {
+      const it = slots[i];
+      return it ? { slot: i, name: it.name, displayName: it.displayName, count: it.count } : null;
+    };
+    const pos = bot.entity.position || {};
+    const dim = String(bot.game?.dimension || '').replace(/^minecraft:/, '');
+    return {
+      health: Math.round(bot.health ?? 0),
+      food: Math.round(bot.food ?? 0),
+      saturation: Math.round(bot.foodSaturation ?? 0),
+      xpLevel: bot.experience?.level ?? 0,
+      xpProgress: bot.experience?.progress ?? 0,
+      x: Math.round(pos.x ?? 0), y: Math.round(pos.y ?? 0), z: Math.round(pos.z ?? 0),
+      yaw: Math.round(((bot.entity.yaw ?? 0) * 180) / Math.PI),
+      pitch: Math.round(((bot.entity.pitch ?? 0) * 180) / Math.PI),
+      dimension: dim || 'overworld',
+      gameMode: bot.game?.gameMode ?? '—',
+      ping: bot.player?.ping ?? null,
+      uptime: this._startedAt ? Math.floor((Date.now() - this._startedAt) / 1000) : 0,
+      armor: [armorAt(5), armorAt(6), armorAt(7), armorAt(8)],
+    };
+  }
+
+  _emitTelemetry() {
+    if (!this._onTelemetry) return;
+    const t = this.currentTelemetry();
+    if (t) { try { this._onTelemetry(t); } catch (_) {} }
+  }
+
+  startTelemetry() {
+    if (!this._onTelemetry || this._telemetryInterval) return;
+    this._emitTelemetry();
+    this._telemetryInterval = setInterval(() => this._emitTelemetry(), 1000);
+  }
+
+  clearTelemetry() {
+    if (this._telemetryInterval) { clearInterval(this._telemetryInterval); this._telemetryInterval = null; }
+  }
 
   _emitInventory() {
     if (!this._onInventory || this._invThrottle) return;
@@ -190,6 +238,7 @@ class BotRunner {
   scheduleReconnect() {
     this.clearAntiAfk();
     this.stopAutoclick();
+    this.clearTelemetry();
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
     if (this.reconnectTimeout) return;
@@ -277,6 +326,8 @@ class BotRunner {
     this.reconnectTimeout = null;
     this.clearAntiAfk();
     this.stopAutoclick();
+    this.clearTelemetry();
+    this._startedAt = null;
     clearTimeout(this.state.transferTimeout);
     this.state.transferTimeout = null;
     if (this._invThrottle) { clearTimeout(this._invThrottle); this._invThrottle = null; }
@@ -302,6 +353,7 @@ class BotRunner {
     this.state.transferTimeout = null;
     this._invWired = false;
 
+    if (!this._startedAt) this._startedAt = Date.now();
     this._setStatus('connecting');
     this.log('info', `Connecting to ${this.config.host}:${this.config.port}...`);
 
@@ -360,6 +412,7 @@ class BotRunner {
     this.bot.on('spawn', () => {
       this._attachViewer();
       this._emitInventory();
+      this.startTelemetry();
       if (this.bot.inventory && !this._invWired) {
         this._invWired = true;
         this.bot.inventory.on('updateSlot', () => this._emitInventory());

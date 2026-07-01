@@ -63,6 +63,8 @@ wss.on('connection', (ws) => {
     sendTo('status', { accountId: id, state: r.status });
     const slots = r.currentInventory();
     if (slots && slots.some(Boolean)) sendTo('inventory', { accountId: id, slots });
+    const telemetry = r.currentTelemetry();
+    if (telemetry) sendTo('telemetry', { accountId: id, data: telemetry });
   }
   const a = msaQueue.active;
   if (a) sendTo('auth', { active: true, ...a });
@@ -92,6 +94,7 @@ function makeRunner(account) {
     setStatus: (state) => broadcast('status', { accountId: account.id, state }),
     msaQueue,
     onInventory: (slots) => broadcast('inventory', { accountId: account.id, slots }),
+    onTelemetry: (data) => broadcast('telemetry', { accountId: account.id, data }),
   });
 }
 
